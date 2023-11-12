@@ -4,53 +4,54 @@ import axios from "axios";
 
 function DeckOfCards() {
   const [cardImgSrc, setCardImgSrc] = useState("");
-  const [cardCount, setCardCount] = useState(0);
-  const [startAndStop, setStartAndStop] = useState("stop");
+  const [autoDraw, setAutoDraw] = useState(false);
+  const [remaing, setRemaining] = useState("");
 
   const deckId = useRef();
-  const intervalId = useRef();
-  const btn = useRef();
+  const intervalId = useRef(null);
+
   useEffect(() => {
     axios
       .get("https://deckofcardsapi.com/api/deck/new/shuffle/")
       .then((res) => (deckId.current = res.data.deck_id));
   }, []);
-  const handleClick = () => {
-    startAndStop === "stop"
-      ? setStartAndStop(() => "start")
-      : setStartAndStop(() => "stop") && clearInterval(intervalId);
+  const toggleAutoDraw = () => {
+    setAutoDraw((auto) => !auto);
   };
 
   useEffect(() => {
-    intervalId.current = setInterval(() => {
-      async function getcards() {
-        const res = await axios.get(
-          `https://deckofcardsapi.com/api/deck/${deckId.current}/draw/`
-        );
-        setCardCount((cardCount) => cardCount + 1);
-        setCardImgSrc((cardImgSrc) => (cardImgSrc = res.data.cards[0].image));
-      }
-      getcards();
-    }, 1000);
-  }, [startAndStop]);
+    async function getCard() {
+      try {
+        if (remaing === 0) {
+          throw new Error("No cards remaining!");
+        } else {
+          const res = await axios.get(
+            `https://deckofcardsapi.com/api/deck/${deckId.current}/draw/`
+          );
 
-  const getCard = async () => {
-    if (cardCount === 52) {
-      clearInterval(intervalId);
-      alert("No cards remaining!");
-    } else {
-      const res = await axios.get(
-        `https://deckofcardsapi.com/api/deck/${deckId.current}/draw/`
-      );
-      setCardCount(() => cardCount + 1);
-      setCardImgSrc(() => res.data.cards[0].image);
+          setRemaining((_remaing) => (_remaing = res.data.remaining));
+          setCardImgSrc((_src) => (_src = res.data.cards[0].image));
+        }
+      } catch (e) {
+        alert(e);
+      }
     }
-  };
+    if (autoDraw && !intervalId.current) {
+      intervalId.current = setInterval(async () => {
+        await getCard();
+      }, 1000);
+    }
+
+    return () => {
+      clearInterval(intervalId.current);
+      intervalId.current = null;
+    };
+  }, [autoDraw, setAutoDraw, remaing]);
 
   return (
     <div>
-      <button ref={btn} onClick={handleClick}>
-        {startAndStop}
+      <button onClick={toggleAutoDraw}>
+        {autoDraw ? "STOP" : "KEEP"} DRAWING FOR ME!
       </button>
       <Card src={cardImgSrc} />
     </div>
